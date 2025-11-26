@@ -68,6 +68,9 @@ BEGIN_MESSAGE_MAP(COverlayDlg, CDialogEx)
     ON_WM_WINDOWPOSCHANGING()
     ON_COMMAND(ID_TRAY_OVERLAY_SETTING, &COverlayDlg::OnTrayOverlaySetting)
     ON_COMMAND(ID_TRAY_EXIT, &COverlayDlg::OnTrayExit)
+    ON_WM_MOUSEMOVE()
+    ON_WM_LBUTTONUP()
+    ON_WM_LBUTTONDOWN()
 END_MESSAGE_MAP()
 
 BOOL COverlayDlg::OnInitDialog()
@@ -104,6 +107,13 @@ BOOL COverlayDlg::OnInitDialog()
     _tcscpy_s(m_nid.szTip, _T("Overlay App"));
     Shell_NotifyIcon(NIM_ADD, &m_nid);
 
+
+    OverlayRect r;
+    r.rc = CRect(200, 200, 300, 300);
+    r.selected = false;
+
+    m_rects.push_back(r);
+
     // 한 번 TopMost로 올림 (초기 정렬)
     SetWindowPos(&wndTopMost, 0, 0, 0, 0,
         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
@@ -124,29 +134,20 @@ BOOL COverlayDlg::OnEraseBkgnd(CDC* pDC)
     CBrush brush(RGB(255, 0, 255)); // 컬러키와 동일하게
     pDC->FillRect(&rc, &brush);
 
-    // TRUE/FALSE 상관없지만, 여기서는 TRUE 반환
     return TRUE;
 }
 
 void COverlayDlg::OnPaint()
 {
-    CPaintDC dc(this); // device context for painting
-
-    // 검은 네모 위치 설정 (화면 중앙에 200x200 예시)
-    CRect rcClient;
-    GetClientRect(&rcClient);
-
-    int width = 200;
-    int height = 200;
-    int left = (rcClient.Width() - width) / 2;
-    int top = (rcClient.Height() - height) / 2;
-    int right = left + width;
-    int bottom = top + height;
+    CPaintDC dc(this);
 
     CBrush blackBrush(RGB(0, 0, 0));
     CBrush* pOldBrush = dc.SelectObject(&blackBrush);
 
-    dc.Rectangle(left, top, right, bottom);
+    for (const auto& r : m_rects)
+    {
+        dc.Rectangle(r.rc);
+    }
 
     dc.SelectObject(pOldBrush);
 }
@@ -182,7 +183,6 @@ LRESULT COverlayDlg::OnTrayIcon(WPARAM wParam, LPARAM lParam)
 
         if (cmd != 0)
         {
-            // 선택된 메뉴 ID를 그대로 WM_COMMAND로 처리
             PostMessage(WM_COMMAND, cmd, 0);
         }
     }
@@ -216,12 +216,25 @@ void COverlayDlg::OnWindowPosChanging(WINDOWPOS* lpwndpos)
 
 LRESULT COverlayDlg::OnNcHitTest(CPoint point)
 {
-    return HTTRANSPARENT;
+    return HTCLIENT;
 }
 
-void COverlayDlg::OnTrayOverlaySetting()
-{
-    // 설정창 구현 예정
+void COverlayDlg::OnTrayOverlaySetting()  
+{  
+   LONG exStyle = GetWindowLong(m_hWnd, GWL_EXSTYLE);  
+
+   exStyle &= ~(WS_EX_TRANSPARENT | WS_EX_NOACTIVATE);
+
+   SetWindowLong(m_hWnd, GWL_EXSTYLE, exStyle); 
+   SetWindowPos(nullptr, 0, 0, 0, 0,  
+       SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);  
+
+   if (!::IsWindow(m_settingDig.GetSafeHwnd()))
+   {
+       m_settingDig.Create(IDD_PROPPAGE, this);
+   }
+
+   m_settingDig.ShowWindow(SW_SHOW);
 }
 
 void COverlayDlg::OnTrayExit()
@@ -229,4 +242,195 @@ void COverlayDlg::OnTrayExit()
     Shell_NotifyIcon(NIM_DELETE, &m_nid);
 
     PostQuitMessage(0);
+}
+
+HitType COverlayDlg::HitTestRect(const CRect& rc, CPoint pt)
+{
+    const int EDGE = 5; // 가장자리 판정 여유
+
+    if (!rc.PtInRect(pt))
+        return HT_NONE;
+
+    bool left = abs(pt.x - rc.left) <= EDGE;
+    bool right = abs(pt.x - rc.right) <= EDGE;
+    bool top = abs(pt.y - rc.top) <= EDGE;
+    bool bottom = abs(pt.y - rc.bottom) <= EDGE;
+
+    if (left && top)         return HT_TOPLEFT;
+    if (right && top)        return HT_TOPRIGHT;
+    if (left && bottom)      return HT_BOTTOMLEFT;
+    if (right && bottom)     return HT_BOTTOMRIGHT;
+    if (left)                return HT_LEFT;
+    if (right)               return HT_RIGHT;
+    if (top)                 return HT_TOP;
+    if (bottom)              return HT_BOTTOM;
+
+    return HT_MOVE; // 내부
+}
+void COverlayDlg::UpdateCursorByHitType(HitType ht)
+{
+    HCURSOR hCur = ::LoadCursor(NULL, IDC_ARROW);
+
+    switch (ht)
+    {
+    case HT_MOVE:
+        hCur = ::LoadCursor(NULL, IDC_SIZEALL);
+        break;
+
+    case HT_LEFT:
+    case HT_RIGHT:
+        hCur = ::LoadCursor(NULL, IDC_SIZEWE);
+        break;
+
+    case HT_TOP:
+    case HT_BOTTOM:
+        hCur = ::LoadCursor(NULL, IDC_SIZENS);
+        break;
+
+    case HT_TOPLEFT:
+    case HT_BOTTOMRIGHT:
+        hCur = ::LoadCursor(NULL, IDC_SIZENWSE);
+        break;
+
+    case HT_TOPRIGHT:
+    case HT_BOTTOMLEFT:
+        hCur = ::LoadCursor(NULL, IDC_SIZENESW);
+        break;
+
+    case HT_NONE:
+    default:
+        hCur = ::LoadCursor(NULL, IDC_ARROW);
+        break;
+    }
+
+    ::SetCursor(hCur);
+}
+
+afx_msg void COverlayDlg::OnMouseMove(UINT nFlags, CPoint point)
+{
+    TRACE(_T("Hit\n"));
+    if (m_bDragging && (nFlags & MK_LBUTTON) && m_hitIndex >= 0)
+    {
+        CPoint delta = point - m_lastPt;
+        CRect rc = m_rcOrig;
+
+        const int MIN_W = 10;
+        const int MIN_H = 10;
+
+        switch (m_hitType)
+        {
+        case HT_MOVE:
+            rc.OffsetRect(delta);
+            break;
+
+        case HT_LEFT:
+            rc.left += delta.x;
+            if (rc.Width() < MIN_W) rc.left = rc.right - MIN_W;
+            break;
+
+        case HT_RIGHT:
+            rc.right += delta.x;
+            if (rc.Width() < MIN_W) rc.right = rc.left + MIN_W;
+            break;
+
+        case HT_TOP:
+            rc.top += delta.y;
+            if (rc.Height() < MIN_H) rc.top = rc.bottom - MIN_H;
+            break;
+
+        case HT_BOTTOM:
+            rc.bottom += delta.y;
+            if (rc.Height() < MIN_H) rc.bottom = rc.top + MIN_H;
+            break;
+
+        case HT_TOPLEFT:
+            rc.left += delta.x;
+            rc.top += delta.y;
+            if (rc.Width() < MIN_W)  rc.left = rc.right - MIN_W;
+            if (rc.Height() < MIN_H) rc.top = rc.bottom - MIN_H;
+            break;
+
+        case HT_TOPRIGHT:
+            rc.right += delta.x;
+            rc.top += delta.y;
+            if (rc.Width() < MIN_W)  rc.right = rc.left + MIN_W;
+            if (rc.Height() < MIN_H) rc.top = rc.bottom - MIN_H;
+            break;
+
+        case HT_BOTTOMLEFT:
+            rc.left += delta.x;
+            rc.bottom += delta.y;
+            if (rc.Width() < MIN_W)  rc.left = rc.right - MIN_W;
+            if (rc.Height() < MIN_H) rc.bottom = rc.top + MIN_H;
+            break;
+
+        case HT_BOTTOMRIGHT:
+            rc.right += delta.x;
+            rc.bottom += delta.y;
+            if (rc.Width() < MIN_W)  rc.right = rc.left + MIN_W;
+            if (rc.Height() < MIN_H) rc.bottom = rc.top + MIN_H;
+            break;
+
+        default:
+            break;
+        }
+
+        m_rects[m_hitIndex].rc = rc;
+        Invalidate(FALSE);
+        return;
+    }
+
+    // 드래그 중이 아니면 커서만 변경
+    HitType ht = HT_NONE;
+    for (int i = (int)m_rects.size() - 1; i >= 0; --i)
+    {
+        ht = HitTestRect(m_rects[i].rc, point);
+        if (ht != HT_NONE)
+            break;
+    }
+
+    UpdateCursorByHitType(ht);
+
+    TRACE(_T("HitType = %d\n"), (int)ht);
+
+    CDialogEx::OnMouseMove(nFlags, point);
+}
+
+
+void COverlayDlg::OnLButtonDown(UINT nFlags, CPoint point)
+{
+    CDialogEx::OnLButtonDown(nFlags, point);
+
+    m_bDragging = false;
+    m_hitIndex = -1;
+    m_hitType = HT_NONE;
+
+    for (int i = (int)m_rects.size() - 1; i >= 0; --i)
+    {
+        const CRect& rc = m_rects[i].rc;
+        HitType ht = HitTestRect(rc, point);
+        if (ht != HT_NONE)
+        {
+            m_bDragging = true;
+            m_hitIndex = i;
+            m_hitType = ht;
+            m_lastPt = point;
+            m_rcOrig = rc;
+            SetCapture();
+            break;
+        }
+    }
+}
+
+void COverlayDlg::OnLButtonUp(UINT nFlags, CPoint point)
+{
+    if (m_bDragging)
+    {
+        ReleaseCapture();
+        m_bDragging = false;
+        m_hitIndex = -1;
+        m_hitType = HT_NONE;
+    }
+
+    CDialogEx::OnLButtonUp(nFlags, point);
 }

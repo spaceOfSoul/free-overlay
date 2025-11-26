@@ -10,4 +10,8 @@
 // 여기에 미리 컴파일하려는 헤더 추가
 #include "framework.h"
 
+#define WM_CLEAR_RECT (WM_APP + 100)
+#define WM_ADD_RECT (WM_APP + 101)
+#define WM_CLOSE_SETTING (WM_APP + 102)
+
 #endif //PCH_H

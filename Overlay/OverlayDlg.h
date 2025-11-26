@@ -4,9 +4,24 @@
 
 #pragma once
 #include <shellapi.h>
+#include <vector>
+#include "CSettingDig.h"
 
 #define WM_TRAYICON (WM_APP + 1)
 #define TRAY_ICON_ID 1
+
+enum HitType {
+	HT_NONE = 0,
+	HT_MOVE,
+	HT_LEFT,
+	HT_RIGHT,
+	HT_TOP,
+	HT_BOTTOM,
+	HT_TOPLEFT,
+	HT_TOPRIGHT,
+	HT_BOTTOMLEFT,
+	HT_BOTTOMRIGHT
+};
 
 // COverlayDlg 대화 상자
 class COverlayDlg : public CDialogEx
@@ -43,5 +58,34 @@ protected:
 	afx_msg void OnTrayOverlaySetting();
 	afx_msg void OnTrayExit();
 
+	// setting dig
+	CSettingDig m_settingDig;
+
+	// drag implement
+	bool m_editModeFlag = false;
+
+	struct OverlayRect {
+		CRect rc;
+		bool  selected;
+	};
+	std::vector<OverlayRect> m_rects;
+
+	bool    m_bDragging = false;
+	HitType m_hitType = HT_NONE;
+	int     m_hitIndex = -1;
+	CPoint  m_lastPt;
+	CRect   m_rcOrig;
+
+	HitType COverlayDlg::HitTestRect(const CRect& rc, CPoint pt);
+	void COverlayDlg::UpdateCursorByHitType(HitType ht);
+	void COverlayDlg::OnLButtonDown(UINT nFlags, CPoint point);
+	void COverlayDlg::OnLButtonUp(UINT nFlags, CPoint point);
+
+	LRESULT COverlayDlg::OnAddRect(WPARAM wParam, LPARAM lParam);
+	LRESULT COverlayDlg::OnClearRect(WPARAM wParam, LPARAM lParam);
+	LRESULT COverlayDlg::OnCloseSetting(WPARAM wParam, LPARAM lParam);
+
 	DECLARE_MESSAGE_MAP()
+public:
+	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 };

@@ -183,6 +183,7 @@
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="CSettingDig.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Overlay.h" />
     <ClInclude Include="OverlayDlg.h" />
@@ -191,6 +192,7 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CSettingDig.cpp" />
     <ClCompile Include="Overlay.cpp" />
     <ClCompile Include="OverlayDlg.cpp" />
     <ClCompile Include="pch.cpp">
