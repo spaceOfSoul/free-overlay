@@ -71,6 +71,9 @@ BEGIN_MESSAGE_MAP(COverlayDlg, CDialogEx)
     ON_WM_MOUSEMOVE()
     ON_WM_LBUTTONUP()
     ON_WM_LBUTTONDOWN()
+    ON_MESSAGE(WM_ADD_RECT, OnAddRect)
+    ON_MESSAGE(WM_CLEAR_RECT, OnClearRect)
+    ON_MESSAGE(WM_CLOSE_SETTING, OnCloseSetting)
 END_MESSAGE_MAP()
 
 BOOL COverlayDlg::OnInitDialog()
@@ -107,9 +110,17 @@ BOOL COverlayDlg::OnInitDialog()
     _tcscpy_s(m_nid.szTip, _T("Overlay App"));
     Shell_NotifyIcon(NIM_ADD, &m_nid);
 
-
     OverlayRect r;
-    r.rc = CRect(200, 200, 300, 300);
+
+    const int w = 100;
+    const int h = 100;
+
+    CRect rcScreen;
+    SystemParametersInfo(SPI_GETWORKAREA, 0, &rcScreen, 0);
+    int rect_cx = rcScreen.left + (rcScreen.Width() - w) / 2;
+    int rect_cy = rcScreen.top + (rcScreen.Height() - h) / 2;
+
+    r.rc = CRect(rect_cx, rect_cy, rect_cx + w, rect_cy + h);
     r.selected = false;
 
     m_rects.push_back(r);
@@ -376,7 +387,8 @@ afx_msg void COverlayDlg::OnMouseMove(UINT nFlags, CPoint point)
         }
 
         m_rects[m_hitIndex].rc = rc;
-        Invalidate(FALSE);
+        Invalidate(TRUE);
+        UpdateWindow();
         return;
     }
 
@@ -420,6 +432,9 @@ void COverlayDlg::OnLButtonDown(UINT nFlags, CPoint point)
             break;
         }
     }
+
+    Invalidate(TRUE);
+    UpdateWindow();
 }
 
 void COverlayDlg::OnLButtonUp(UINT nFlags, CPoint point)
@@ -432,5 +447,49 @@ void COverlayDlg::OnLButtonUp(UINT nFlags, CPoint point)
         m_hitType = HT_NONE;
     }
 
+    Invalidate(TRUE);
+    UpdateWindow();
     CDialogEx::OnLButtonUp(nFlags, point);
+}
+
+LRESULT COverlayDlg::OnAddRect(WPARAM wParam, LPARAM lParam) {
+    OverlayRect r;
+
+    CRect rcScreen;
+    SystemParametersInfo(SPI_GETWORKAREA, 0, &rcScreen, 0);
+
+    const int w = 100;
+    const int h = 100;
+
+    int cx = rcScreen.left + (rcScreen.Width() - w) / 2;
+    int cy = rcScreen.top + (rcScreen.Height() - h) / 2;
+
+    r.rc = CRect(cx, cy, cx + w, cy + h);
+    r.selected = false;
+
+    m_rects.push_back(r);
+
+    Invalidate(TRUE);
+    UpdateWindow();
+
+    return 0;
+}
+
+LRESULT COverlayDlg::OnClearRect(WPARAM wParam, LPARAM lParam) {
+    m_rects.clear();
+
+    Invalidate(TRUE);
+    UpdateWindow();
+    return 0;
+}
+
+LRESULT COverlayDlg::OnCloseSetting(WPARAM wParam, LPARAM lParam) {
+    LONG exStyle = GetWindowLong(m_hWnd, GWL_EXSTYLE);
+
+    exStyle |= (WS_EX_TRANSPARENT | WS_EX_NOACTIVATE);
+
+    SetWindowLong(m_hWnd, GWL_EXSTYLE, exStyle);
+    SetWindowPos(nullptr, 0, 0, 0, 0,
+        SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
+    return 0;
 }

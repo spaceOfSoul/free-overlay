@@ -1,7 +1,6 @@
 ﻿#pragma once
 #include "afxdialogex.h"
 
-
 // CSettingDig 대화 상자
 
 class CSettingDig : public CDialogEx

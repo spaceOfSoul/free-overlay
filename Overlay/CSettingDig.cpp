@@ -38,15 +38,29 @@ END_MESSAGE_MAP()
 
 void CSettingDig::OnBnClickedBtnNewRect()
 {
-	CDialogEx* pParent = (CDialogEx*)GetParent();
+    CWnd* pParent = GetParent();
+    if (pParent && ::IsWindow(pParent->GetSafeHwnd()))
+    {
+        pParent->SendMessage(WM_ADD_RECT, 0, 0);
+    }
 }
 
 void CSettingDig::OnBnClickedBtnClear()
 {
-	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+    CWnd* pParent = GetParent();
+    if (pParent && ::IsWindow(pParent->GetSafeHwnd()))
+    {
+        pParent->SendMessage(WM_CLEAR_RECT, 0, 0);
+    }
 }
 
 void CSettingDig::OnBnClickedBtnSaveAndClose()
 {
-	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+    CWnd* pParent = GetParent();
+    if (pParent && ::IsWindow(pParent->GetSafeHwnd()))
+    {
+        pParent->SendMessage(WM_CLOSE_SETTING, 0, 0);
+    }
+
+    DestroyWindow();
 }
